@@ -12,3 +12,13 @@ KeepOne.xcodeproj/xcuserdata/
 
 # Local-only test photos
 SampleTestFoto/
+
+# Never commit test/media photos
+*.jpg
+*.jpeg
+*.png
+*.heic
+*.heif
+*.gif
+*.tif
+*.tiff
