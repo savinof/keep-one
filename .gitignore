@@ -1,0 +1,14 @@
+.DS_Store
+DerivedData/
+.build/
+xcuserdata/
+*.xcuserstate
+*.xccheckout
+*.xcscmblueprint
+
+# Xcode intermediate/user files
+KeepOne.xcodeproj/project.xcworkspace/xcuserdata/
+KeepOne.xcodeproj/xcuserdata/
+
+# Local-only test photos
+SampleTestFoto/
