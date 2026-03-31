@@ -150,17 +150,36 @@ For the selected month only:
 
 No full-library clustering, no all-vs-all across the month.
 
+## Current Similarity Criteria (Relaxed but Controlled)
+
+- Base thresholds:
+  - Vision feature-print distance (`default: 13`)
+  - dHash normalized Hamming distance (`default: 0.26`)
+- Thresholds are relaxed by temporal proximity (closer-in-time pairs allow more variation).
+- Extra tolerance is applied when both photos likely contain the same subject:
+  - both include faces
+  - face count is close
+  - face area ratio is close
+- Mixed cases (face vs no-face) and no-face pairs are evaluated with stricter caps.
+- Pairwise graph edges are limited to close capture times (`<= 180s`) unless same burst id.
+- Very large visual distances are still rejected to avoid clear false positives.
+- Matching remains sequence-scoped only (month + user-selected time gap), never whole-library.
+
 ## Ranking Strategy (Suggestion, Not Guarantee)
 
-`RankingService` computes an explainable heuristic score per photo with signals:
-- sharpness proxy (from thumbnail gradients)
-- face visibility proxy (face count + area)
+`RankingService` computes an explainable heuristic score per photo with signals inspired by Apple’s published high-level direction (multi-signal curation, not a single metric):
+- face clarity (count, prominence, centering)
+- sharpness proxy (thumbnail gradients)
+- composition prominence (saliency + centering)
+- exposure balance (brightness + contrast)
 - resolution signal
 - burst auto-pick bonus (when present)
 - favorite bonus
 - screenshot penalty
 
 The top score becomes `suggestedBestAssetID`. UI labels it as a suggestion only.
+
+Apple has not publicly documented an exact Featured-Photo/Key-Photo formula, so this MVP uses a transparent on-device approximation.
 
 ## Caching Approach
 

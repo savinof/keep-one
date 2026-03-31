@@ -37,4 +37,36 @@ final class RankingServiceTests: XCTestCase {
         XCTAssertEqual(ranked.first?.asset.localIdentifier, "normal")
         XCTAssertEqual(ranked.last?.asset.localIdentifier, "screenshot")
     }
+
+    func testRankingPrefersBetterFaceClarityOverSmallSharpnessDifference() {
+        let faceClear = TestFixtures.asset(id: "faceClear", secondsSinceReferenceDate: 0, pixelWidth: 1600, pixelHeight: 1200)
+        let slightlySharper = TestFixtures.asset(id: "slightlySharper", secondsSinceReferenceDate: 1, pixelWidth: 1600, pixelHeight: 1200)
+
+        let features = [
+            faceClear.localIdentifier: TestFixtures.feature(
+                asset: faceClear,
+                sharpness: 0.72,
+                faceCount: 1,
+                faceAreaRatio: 0.28,
+                faceCentering: 0.88,
+                luminanceMean: 0.52,
+                luminanceContrast: 0.35,
+                saliencyScore: 0.70
+            ),
+            slightlySharper.localIdentifier: TestFixtures.feature(
+                asset: slightlySharper,
+                sharpness: 0.84,
+                faceCount: 1,
+                faceAreaRatio: 0.08,
+                faceCentering: 0.20,
+                luminanceMean: 0.52,
+                luminanceContrast: 0.35,
+                saliencyScore: 0.20
+            )
+        ]
+
+        let ranked = RankingService().rank(assets: [slightlySharper, faceClear], featuresByAssetID: features)
+
+        XCTAssertEqual(ranked.first?.asset.localIdentifier, "faceClear")
+    }
 }

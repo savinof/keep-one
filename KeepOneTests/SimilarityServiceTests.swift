@@ -35,6 +35,28 @@ final class SimilarityServiceTests: XCTestCase {
         XCTAssertFalse(SimilarityService().areSimilar(lhsFeatures, rhsFeatures, config: config))
     }
 
+    func testLooserSimilarityForLikelySameSubjectWithinFiveMinutes() {
+        let lhs = TestFixtures.asset(id: "lhs", secondsSinceReferenceDate: 0)
+        let rhs = TestFixtures.asset(id: "rhs", secondsSinceReferenceDate: 280)
+
+        let lhsFeatures = TestFixtures.feature(asset: lhs, hash: 0, faceCount: 1, faceAreaRatio: 0.18)
+        let rhsFeatures = TestFixtures.feature(asset: rhs, hash: hash(withBitCount: 34), faceCount: 1, faceAreaRatio: 0.20)
+        let config = AnalysisConfiguration.default
+
+        XCTAssertTrue(SimilarityService().areSimilar(lhsFeatures, rhsFeatures, config: config))
+    }
+
+    func testFaceShotsWithDifferentFramingRemainRejectedWhenHashTooFar() {
+        let lhs = TestFixtures.asset(id: "lhs", secondsSinceReferenceDate: 0)
+        let rhs = TestFixtures.asset(id: "rhs", secondsSinceReferenceDate: 280)
+
+        let lhsFeatures = TestFixtures.feature(asset: lhs, hash: 0, faceCount: 1, faceAreaRatio: 0.12)
+        let rhsFeatures = TestFixtures.feature(asset: rhs, hash: hash(withBitCount: 36), faceCount: 1, faceAreaRatio: 0.70)
+        let config = AnalysisConfiguration.default
+
+        XCTAssertFalse(SimilarityService().areSimilar(lhsFeatures, rhsFeatures, config: config))
+    }
+
     private func hash(withBitCount bitCount: Int) -> UInt64 {
         guard bitCount > 0 else { return 0 }
         var value: UInt64 = 0

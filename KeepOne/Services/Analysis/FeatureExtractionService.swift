@@ -10,6 +10,10 @@ struct AssetAnalysisFeatures {
     let sharpness: Double
     let faceCount: Int
     let faceAreaRatio: Double
+    let faceCentering: Double
+    let luminanceMean: Double
+    let luminanceContrast: Double
+    let saliencyScore: Double
     let visionFeaturePrint: VNFeaturePrintObservation?
 }
 
@@ -46,15 +50,21 @@ final class FeatureExtractionService: FeatureExtractionServiceProtocol {
 
         let perceptualHash = Self.differenceHash(pixels: hashPixels, width: 9, height: 8)
         let sharpness = Self.estimateSharpness(pixels: sharpnessPixels, width: 64, height: 64)
-        let (faceCount, faceAreaRatio) = Self.detectFaces(in: cgImage)
+        let luminanceStats = Self.luminanceStats(pixels: sharpnessPixels)
+        let faceSignals = Self.detectFaces(in: cgImage)
+        let saliencyScore = Self.computeSaliencyScore(for: cgImage)
         let featurePrint = Self.computeVisionFeaturePrint(for: cgImage)
 
         return AssetAnalysisFeatures(
             asset: asset,
             perceptualHash: perceptualHash,
             sharpness: sharpness,
-            faceCount: faceCount,
-            faceAreaRatio: faceAreaRatio,
+            faceCount: faceSignals.count,
+            faceAreaRatio: faceSignals.areaRatio,
+            faceCentering: faceSignals.centering,
+            luminanceMean: luminanceStats.mean,
+            luminanceContrast: luminanceStats.contrast,
+            saliencyScore: saliencyScore,
             visionFeaturePrint: featurePrint
         )
     }
@@ -126,19 +136,74 @@ final class FeatureExtractionService: FeatureExtractionServiceProtocol {
         return min(1, (total / samples) / 255)
     }
 
-    private static func detectFaces(in image: CGImage) -> (count: Int, areaRatio: Double) {
+    private static func luminanceStats(pixels: [UInt8]) -> (mean: Double, contrast: Double) {
+        guard !pixels.isEmpty else { return (0, 0) }
+
+        let normalized = pixels.map { Double($0) / 255.0 }
+        let mean = normalized.reduce(0, +) / Double(normalized.count)
+        let variance = normalized.reduce(0) { partial, value in
+            let delta = value - mean
+            return partial + (delta * delta)
+        } / Double(normalized.count)
+
+        let stddev = sqrt(max(0, variance))
+        let normalizedContrast = min(1, stddev / 0.5)
+        return (mean, normalizedContrast)
+    }
+
+    private static func detectFaces(in image: CGImage) -> (count: Int, areaRatio: Double, centering: Double) {
         let request = VNDetectFaceRectanglesRequest()
         let handler = VNImageRequestHandler(cgImage: image, options: [:])
 
         do {
             try handler.perform([request])
             let faces = request.results ?? []
-            let area = faces.reduce(0.0) { partial, face in
-                partial + Double(face.boundingBox.width * face.boundingBox.height)
+            guard !faces.isEmpty else {
+                return (0, 0, 0)
             }
-            return (faces.count, min(1, area))
+
+            var totalArea = 0.0
+            var weightedCentering = 0.0
+            let maxDistance = sqrt(0.5 * 0.5 + 0.5 * 0.5)
+
+            for face in faces {
+                let area = Double(face.boundingBox.width * face.boundingBox.height)
+                totalArea += area
+
+                let dx = Double(face.boundingBox.midX - 0.5)
+                let dy = Double(face.boundingBox.midY - 0.5)
+                let distance = sqrt((dx * dx) + (dy * dy))
+                let centeredness = max(0, 1 - min(1, distance / maxDistance))
+                weightedCentering += centeredness * area
+            }
+
+            let centering = totalArea > 0 ? weightedCentering / totalArea : 0
+            return (faces.count, min(1, totalArea), centering)
         } catch {
-            return (0, 0)
+            return (0, 0, 0)
+        }
+    }
+
+    private static func computeSaliencyScore(for image: CGImage) -> Double {
+        let request = VNGenerateAttentionBasedSaliencyImageRequest()
+        let handler = VNImageRequestHandler(cgImage: image, options: [:])
+
+        do {
+            try handler.perform([request])
+            guard
+                let observation = request.results?.first as? VNSaliencyImageObservation,
+                let salientObjects = observation.salientObjects,
+                !salientObjects.isEmpty
+            else {
+                return 0
+            }
+
+            let maxArea = salientObjects.map { Double($0.boundingBox.width * $0.boundingBox.height) }.max() ?? 0
+            let bestConfidence = salientObjects.map { Double($0.confidence) }.max() ?? 0
+            let areaContribution = min(1, maxArea / 0.4)
+            return min(1, (bestConfidence * 0.7) + (areaContribution * 0.3))
+        } catch {
+            return 0
         }
     }
 

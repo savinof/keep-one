@@ -10,12 +10,14 @@ protocol RankingServiceProtocol {
 
 final class RankingService: RankingServiceProtocol {
     private enum Weights {
-        static let sharpness = 0.40
-        static let faceClarity = 0.30
-        static let resolution = 0.20
-        static let favorite = 0.05
-        static let burstAutoPick = 0.10
-        static let screenshotPenalty = -0.50
+        static let sharpness = 0.27
+        static let faceClarity = 0.41
+        static let composition = 0.10
+        static let exposure = 0.09
+        static let resolution = 0.08
+        static let favorite = 0.03
+        static let burstAutoPick = 0.05
+        static let screenshotPenalty = -0.55
     }
 
     func rank(
@@ -27,25 +29,41 @@ final class RankingService: RankingServiceProtocol {
         let sharpnessValues = assets.compactMap { featuresByAssetID[$0.localIdentifier]?.sharpness }
         let faceValues = assets.map {
             let feature = featuresByAssetID[$0.localIdentifier]
-            return (Double(feature?.faceCount ?? 0) * 0.5) + (feature?.faceAreaRatio ?? 0)
+            return Self.faceClarityRawSignal(feature)
+        }
+        let compositionValues = assets.map {
+            let feature = featuresByAssetID[$0.localIdentifier]
+            return Self.compositionRawSignal(feature)
+        }
+        let exposureValues = assets.map {
+            let feature = featuresByAssetID[$0.localIdentifier]
+            return Self.exposureRawSignal(feature)
         }
         let resolutionValues = assets.map { log(Double(max(1, $0.pixelCount))) }
 
         let sharpnessRange = Self.range(for: sharpnessValues)
         let faceRange = Self.range(for: faceValues)
+        let compositionRange = Self.range(for: compositionValues)
+        let exposureRange = Self.range(for: exposureValues)
         let resolutionRange = Self.range(for: resolutionValues)
 
         let candidates = assets.map { asset in
             let feature = featuresByAssetID[asset.localIdentifier]
 
             let sharpnessSignal = Self.normalize(feature?.sharpness ?? 0.2, in: sharpnessRange)
-            let faceSignalRaw = (Double(feature?.faceCount ?? 0) * 0.5) + (feature?.faceAreaRatio ?? 0)
+            let faceSignalRaw = Self.faceClarityRawSignal(feature)
             let faceSignal = Self.normalize(faceSignalRaw, in: faceRange)
+            let compositionSignalRaw = Self.compositionRawSignal(feature)
+            let compositionSignal = Self.normalize(compositionSignalRaw, in: compositionRange)
+            let exposureSignalRaw = Self.exposureRawSignal(feature)
+            let exposureSignal = Self.normalize(exposureSignalRaw, in: exposureRange)
             let resolutionSignal = Self.normalize(log(Double(max(1, asset.pixelCount))), in: resolutionRange)
 
             var contributions: [(reason: String, value: Double)] = []
+            contributions.append(("faces appear clearer", Weights.faceClarity * faceSignal))
             contributions.append(("it appears sharper", Weights.sharpness * sharpnessSignal))
-            contributions.append(("visual details are clearer around faces", Weights.faceClarity * faceSignal))
+            contributions.append(("the subject stands out better", Weights.composition * compositionSignal))
+            contributions.append(("lighting looks more balanced", Weights.exposure * exposureSignal))
             contributions.append(("it has slightly higher resolution", Weights.resolution * resolutionSignal))
 
             if asset.isFavorite {
@@ -62,7 +80,7 @@ final class RankingService: RankingServiceProtocol {
 
             let score = contributions.reduce(0) { $0 + $1.value }
             let topReasons = contributions
-                .filter { $0.value > 0.01 }
+                .filter { $0.value > 0.015 }
                 .sorted { $0.value > $1.value }
                 .prefix(2)
                 .map(\.reason)
@@ -97,5 +115,23 @@ final class RankingService: RankingServiceProtocol {
         guard width > 0 else { return 0 }
         let normalized = (value - range.lowerBound) / width
         return min(1, max(0, normalized))
+    }
+
+    private static func faceClarityRawSignal(_ feature: AssetAnalysisFeatures?) -> Double {
+        guard let feature else { return 0 }
+        return (Double(feature.faceCount) * 0.45) + (feature.faceAreaRatio * 1.0) + (feature.faceCentering * 0.35)
+    }
+
+    private static func compositionRawSignal(_ feature: AssetAnalysisFeatures?) -> Double {
+        guard let feature else { return 0 }
+        return max(feature.faceCentering, feature.saliencyScore)
+    }
+
+    private static func exposureRawSignal(_ feature: AssetAnalysisFeatures?) -> Double {
+        guard let feature else { return 0 }
+        let mean = feature.luminanceMean
+        let midpointDistance = abs(mean - 0.52)
+        let balance = max(0, 1 - min(1, midpointDistance / 0.52))
+        return (balance * 0.65) + (feature.luminanceContrast * 0.35)
     }
 }

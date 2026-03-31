@@ -13,6 +13,8 @@ protocol MonthAnalysisServiceProtocol {
 }
 
 actor MonthAnalysisService: MonthAnalysisServiceProtocol {
+    private static let maxPairwiseEdgeGapSeconds: TimeInterval = 180
+
     private let photoLibraryService: any PhotoLibraryServiceProtocol
     private let featureExtractionService: any FeatureExtractionServiceProtocol
     private let similarityService: any SimilarityServiceProtocol
@@ -136,6 +138,9 @@ actor MonthAnalysisService: MonthAnalysisServiceProtocol {
             totalFeaturesExtracted += featuresByAssetID.count
 
             let adjacency = groupingService.buildAdjacency(assets: sequence.assets) { lhs, rhs in
+                if !Self.withinPairwiseEdgeWindow(lhs: lhs, rhs: rhs) {
+                    return false
+                }
                 guard
                     let lhsFeatures = featuresByAssetID[lhs.localIdentifier],
                     let rhsFeatures = featuresByAssetID[rhs.localIdentifier]
@@ -225,5 +230,15 @@ actor MonthAnalysisService: MonthAnalysisServiceProtocol {
 
     private static func clampTemporalGap(_ seconds: TimeInterval) -> TimeInterval {
         min(900, max(10, seconds))
+    }
+
+    private static func withinPairwiseEdgeWindow(lhs: PhotoAssetRef, rhs: PhotoAssetRef) -> Bool {
+        if let lhsBurst = lhs.burstIdentifier, let rhsBurst = rhs.burstIdentifier, lhsBurst == rhsBurst {
+            return true
+        }
+        guard let lhsDate = lhs.creationDate, let rhsDate = rhs.creationDate else {
+            return false
+        }
+        return abs(lhsDate.timeIntervalSince(rhsDate)) <= maxPairwiseEdgeGapSeconds
     }
 }

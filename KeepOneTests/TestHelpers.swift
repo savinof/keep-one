@@ -29,7 +29,11 @@ enum TestFixtures {
         hash: UInt64 = 0,
         sharpness: Double = 0.2,
         faceCount: Int = 0,
-        faceAreaRatio: Double = 0
+        faceAreaRatio: Double = 0,
+        faceCentering: Double = 0,
+        luminanceMean: Double = 0.5,
+        luminanceContrast: Double = 0.3,
+        saliencyScore: Double = 0
     ) -> AssetAnalysisFeatures {
         AssetAnalysisFeatures(
             asset: asset,
@@ -37,6 +41,10 @@ enum TestFixtures {
             sharpness: sharpness,
             faceCount: faceCount,
             faceAreaRatio: faceAreaRatio,
+            faceCentering: faceCentering,
+            luminanceMean: luminanceMean,
+            luminanceContrast: luminanceContrast,
+            saliencyScore: saliencyScore,
             visionFeaturePrint: nil
         )
     }

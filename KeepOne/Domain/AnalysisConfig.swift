@@ -9,8 +9,8 @@ struct AnalysisConfiguration: Hashable, Codable, Sendable {
 
     static let `default` = AnalysisConfiguration(
         temporalGapThresholdSeconds: 300,
-        visionDistanceThreshold: 12,
-        hashDistanceThreshold: 0.24,
+        visionDistanceThreshold: 13,
+        hashDistanceThreshold: 0.26,
         minimumClusterSize: 2,
         thumbnailSizeForAnalysis: 256
     )

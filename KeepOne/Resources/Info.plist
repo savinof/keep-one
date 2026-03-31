@@ -18,5 +18,9 @@
 	<string>1.0</string>
 	<key>CFBundleVersion</key>
 	<string>1</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>KeepOne needs photo access to analyze similar images in a month you choose and suggest one to keep.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>KeepOne needs photo library write access to delete only photos you explicitly select.</string>
 </dict>
 </plist>
