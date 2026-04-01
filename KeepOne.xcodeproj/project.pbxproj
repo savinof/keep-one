@@ -38,6 +38,7 @@
 		C591B8F84CBEB612E49316F2 /* PhotoThumbnailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F3D83F2EFF95CB820EB800C2 /* PhotoThumbnailView.swift */; };
 		CF8782F2852441E21AFF8E80 /* PhotoModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = F47E54EB3ADBEAEFEAF08471 /* PhotoModels.swift */; };
 		D41213B0C744086AB2CA5113 /* MonthListViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 48F34FCE541F5EECB9ADAD63 /* MonthListViewModel.swift */; };
+		D4FE4C8E7C01819C8A72E2A5 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 91B99D7B0FCA38335C215A3F /* Assets.xcassets */; };
 		D514FB751A563A6F35BA6116 /* SimilarityPresetTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C747EA5B79A39E5F4DD74212 /* SimilarityPresetTests.swift */; };
 		D6C93E86A6EC7E348D686A28 /* KeepOneApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7DC95EF2FA03485A6EE1D78B /* KeepOneApp.swift */; };
 		E5D824EEF1D937223868E53E /* AnalysisConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = 30FF727CCDFA97B61702F0F9 /* AnalysisConfig.swift */; };
@@ -79,12 +80,13 @@
 		7DC95EF2FA03485A6EE1D78B /* KeepOneApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeepOneApp.swift; sourceTree = "<group>"; };
 		7F7CA3375070E180DE434043 /* AppRootViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppRootViewModel.swift; sourceTree = "<group>"; };
 		8BD97B859A77E722D0E988DF /* MonthAnalysisCacheInvalidationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MonthAnalysisCacheInvalidationTests.swift; sourceTree = "<group>"; };
+		91B99D7B0FCA38335C215A3F /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		9A27C52864306861FFE8E9EB /* PermissionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PermissionView.swift; sourceTree = "<group>"; };
 		9A6854A41F4E07FFDFA97F6E /* TemporalSegmentationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TemporalSegmentationTests.swift; sourceTree = "<group>"; };
 		9D1EE17EB6C396C1D07A3864 /* RankingService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RankingService.swift; sourceTree = "<group>"; };
 		A4770B4E2EBB86BE43973863 /* GroupCardRankingSummaryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GroupCardRankingSummaryTests.swift; sourceTree = "<group>"; };
 		A6A4F6CF344423396F63E499 /* AppContainer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppContainer.swift; sourceTree = "<group>"; };
-		B3B8B3C0C7D2BE1E90BA10CF /* KeepOne.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = KeepOne.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		B3B8B3C0C7D2BE1E90BA10CF /* KeepOne.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = KeepOne.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		C747EA5B79A39E5F4DD74212 /* SimilarityPresetTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SimilarityPresetTests.swift; sourceTree = "<group>"; };
 		D19DC72E53EFEE2366151417 /* SimilarityServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SimilarityServiceTests.swift; sourceTree = "<group>"; };
 		D7836B3ED3DA12C3DCE1DCA5 /* SimilarityService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SimilarityService.swift; sourceTree = "<group>"; };
@@ -146,6 +148,7 @@
 			children = (
 				EBE490B5E223C21AABCCE84C /* App */,
 				80743B275BABD29BD0D618E8 /* Domain */,
+				6C9F17FF365092D44FFD59A9 /* Resources */,
 				0360308B5E6E70D471C69C75 /* Services */,
 				03610C730D585C2D235889E8 /* ViewModels */,
 				89D4CA6D55A1514FA6802D5F /* Views */,
@@ -181,6 +184,14 @@
 				3E34EEC4C5A35B9420F5CBDB /* TestHelpers.swift */,
 			);
 			path = KeepOneTests;
+			sourceTree = "<group>";
+		};
+		6C9F17FF365092D44FFD59A9 /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+				91B99D7B0FCA38335C215A3F /* Assets.xcassets */,
+			);
+			path = Resources;
 			sourceTree = "<group>";
 		};
 		80743B275BABD29BD0D618E8 /* Domain */ = {
@@ -269,6 +280,7 @@
 			buildConfigurationList = BD849EC5CB15190EF00CA1F9 /* Build configuration list for PBXNativeTarget "KeepOne" */;
 			buildPhases = (
 				CFE69A5C9C965A411E6C71A3 /* Sources */,
+				BB1AAD80ADF3DC48E047C09F /* Resources */,
 			);
 			buildRules = (
 			);
@@ -289,11 +301,6 @@
 			attributes = {
 				BuildIndependentTargetsInParallel = YES;
 				LastUpgradeCheck = 1430;
-				TargetAttributes = {
-					ABC9C4C50ABC7184FA6AFCBA = {
-						DevelopmentTeam = "";
-					};
-				};
 			};
 			buildConfigurationList = 9804E9FD27896FF8886E655F /* Build configuration list for PBXProject "KeepOne" */;
 			developmentRegion = en;
@@ -314,6 +321,17 @@
 			);
 		};
 /* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		BB1AAD80ADF3DC48E047C09F /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				D4FE4C8E7C01819C8A72E2A5 /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		4FFCCD766CDBA6AAC46B1D2F /* Sources */ = {
@@ -384,7 +402,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
-				DEVELOPMENT_TEAM = "";
+				DEVELOPMENT_TEAM = FB28G37956;
 				INFOPLIST_FILE = KeepOne/Resources/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -554,7 +572,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
-				DEVELOPMENT_TEAM = "";
+				DEVELOPMENT_TEAM = FB28G37956;
 				INFOPLIST_FILE = KeepOne/Resources/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
