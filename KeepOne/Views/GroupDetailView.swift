@@ -5,6 +5,8 @@ struct GroupDetailView: View {
     @StateObject private var viewModel: GroupDetailViewModel
     @State private var previewAssetID: String?
     @State private var showHelpSheet = false
+    @State private var showSuggestionDetails = true
+    @State private var showGroupingDetails = true
 
     private let onDeleted: @MainActor () async -> Void
 
@@ -22,6 +24,46 @@ struct GroupDetailView: View {
         VStack(spacing: 0) {
             ScrollView {
                 VStack(spacing: 12) {
+                    if viewModel.hasRankingDiagnostics {
+                        DisclosureGroup(isExpanded: $showSuggestionDetails) {
+                            VStack(alignment: .leading, spacing: 6) {
+                                ForEach(Array(viewModel.rankingExplanationLines.enumerated()), id: \.offset) { _, line in
+                                    Text(line)
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                        .frame(maxWidth: .infinity, alignment: .leading)
+                                }
+                            }
+                            .padding(.top, 4)
+                        } label: {
+                            Text("Why suggested")
+                                .font(.subheadline.weight(.semibold))
+                        }
+                        .padding(12)
+                        .background(Color(.secondarySystemBackground))
+                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                    }
+
+                    if viewModel.hasSimilarityDiagnostics {
+                        DisclosureGroup(isExpanded: $showGroupingDetails) {
+                            VStack(alignment: .leading, spacing: 6) {
+                                ForEach(Array(viewModel.similarityExplanationLines.enumerated()), id: \.offset) { _, line in
+                                    Text(line)
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                        .frame(maxWidth: .infinity, alignment: .leading)
+                                }
+                            }
+                            .padding(.top, 4)
+                        } label: {
+                            Text("Why grouped")
+                                .font(.subheadline.weight(.semibold))
+                        }
+                        .padding(12)
+                        .background(Color(.secondarySystemBackground))
+                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                    }
+
                     LazyVGrid(columns: columns, spacing: 10) {
                         ForEach(viewModel.group.assets) { asset in
                             photoTile(asset: asset)

@@ -31,6 +31,8 @@ enum TestFixtures {
         faceCount: Int = 0,
         faceAreaRatio: Double = 0,
         faceCentering: Double = 0,
+        eyeOpenness: Double = 0,
+        expressionScore: Double = 0,
         luminanceMean: Double = 0.5,
         luminanceContrast: Double = 0.3,
         saliencyScore: Double = 0
@@ -42,6 +44,8 @@ enum TestFixtures {
             faceCount: faceCount,
             faceAreaRatio: faceAreaRatio,
             faceCentering: faceCentering,
+            eyeOpenness: eyeOpenness,
+            expressionScore: expressionScore,
             luminanceMean: luminanceMean,
             luminanceContrast: luminanceContrast,
             saliencyScore: saliencyScore,

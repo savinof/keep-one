@@ -10,11 +10,13 @@ protocol RankingServiceProtocol {
 
 final class RankingService: RankingServiceProtocol {
     private enum Weights {
-        static let sharpness = 0.27
-        static let faceClarity = 0.41
-        static let composition = 0.10
-        static let exposure = 0.09
-        static let resolution = 0.08
+        static let sharpness = 0.24
+        static let faceClarity = 0.30
+        static let eyeOpenness = 0.16
+        static let expression = 0.10
+        static let composition = 0.08
+        static let exposure = 0.07
+        static let resolution = 0.07
         static let favorite = 0.03
         static let burstAutoPick = 0.05
         static let screenshotPenalty = -0.55
@@ -31,6 +33,12 @@ final class RankingService: RankingServiceProtocol {
             let feature = featuresByAssetID[$0.localIdentifier]
             return Self.faceClarityRawSignal(feature)
         }
+        let eyeValues = assets.map {
+            featuresByAssetID[$0.localIdentifier]?.eyeOpenness ?? 0
+        }
+        let expressionValues = assets.map {
+            featuresByAssetID[$0.localIdentifier]?.expressionScore ?? 0
+        }
         let compositionValues = assets.map {
             let feature = featuresByAssetID[$0.localIdentifier]
             return Self.compositionRawSignal(feature)
@@ -43,6 +51,8 @@ final class RankingService: RankingServiceProtocol {
 
         let sharpnessRange = Self.range(for: sharpnessValues)
         let faceRange = Self.range(for: faceValues)
+        let eyeRange = Self.range(for: eyeValues)
+        let expressionRange = Self.range(for: expressionValues)
         let compositionRange = Self.range(for: compositionValues)
         let exposureRange = Self.range(for: exposureValues)
         let resolutionRange = Self.range(for: resolutionValues)
@@ -53,6 +63,8 @@ final class RankingService: RankingServiceProtocol {
             let sharpnessSignal = Self.normalize(feature?.sharpness ?? 0.2, in: sharpnessRange)
             let faceSignalRaw = Self.faceClarityRawSignal(feature)
             let faceSignal = Self.normalize(faceSignalRaw, in: faceRange)
+            let eyeSignal = Self.normalize(feature?.eyeOpenness ?? 0, in: eyeRange)
+            let expressionSignal = Self.normalize(feature?.expressionScore ?? 0, in: expressionRange)
             let compositionSignalRaw = Self.compositionRawSignal(feature)
             let compositionSignal = Self.normalize(compositionSignalRaw, in: compositionRange)
             let exposureSignalRaw = Self.exposureRawSignal(feature)
@@ -61,6 +73,8 @@ final class RankingService: RankingServiceProtocol {
 
             var contributions: [(reason: String, value: Double)] = []
             contributions.append(("faces appear clearer", Weights.faceClarity * faceSignal))
+            contributions.append(("eyes appear more open", Weights.eyeOpenness * eyeSignal))
+            contributions.append(("expression looks better", Weights.expression * expressionSignal))
             contributions.append(("it appears sharper", Weights.sharpness * sharpnessSignal))
             contributions.append(("the subject stands out better", Weights.composition * compositionSignal))
             contributions.append(("lighting looks more balanced", Weights.exposure * exposureSignal))

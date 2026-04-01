@@ -5,6 +5,8 @@ struct MonthAnalysisView: View {
     @EnvironmentObject private var container: AppContainer
     @State private var isShowingGapSheet = false
     @State private var draftGapSeconds: Double = AnalysisConfiguration.default.temporalGapThresholdSeconds
+    @State private var draftPreset: SimilarityPreset = AnalysisConfiguration.default.similarityPreset
+    @State private var draftCacheValidationMode: CacheValidationMode = .lightweightSnapshot
 
     init(viewModel: MonthAnalysisViewModel) {
         _viewModel = StateObject(wrappedValue: viewModel)
@@ -32,14 +34,23 @@ struct MonthAnalysisView: View {
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Button("Re-Run") {
-                    Task { await viewModel.analyze(forceRecompute: true) }
+                    Task { await viewModel.analyze(forceRecompute: true, runMode: .localFirst) }
                 }
                 .disabled(viewModel.state == .loading)
             }
 
             ToolbarItem(placement: .topBarTrailing) {
-                Button("Gap \(viewModel.temporalGapLabel())") {
+                Button("Improve") {
+                    Task { await viewModel.improveWithNetwork() }
+                }
+                .disabled(viewModel.state == .loading || !viewModel.canImproveWithNetwork)
+            }
+
+            ToolbarItem(placement: .topBarTrailing) {
+                Button("\(viewModel.similarityPreset.title) · \(viewModel.temporalGapLabel())") {
                     draftGapSeconds = viewModel.temporalGapSeconds
+                    draftPreset = viewModel.similarityPreset
+                    draftCacheValidationMode = viewModel.cacheValidationMode
                     isShowingGapSheet = true
                 }
                 .disabled(viewModel.state == .loading)
@@ -48,12 +59,25 @@ struct MonthAnalysisView: View {
         .task {
             await viewModel.loadSettingsIfNeeded()
             if viewModel.result == nil {
-                await viewModel.analyze(forceRecompute: false)
+                await viewModel.analyze(forceRecompute: false, runMode: .localFirst)
             }
         }
         .sheet(isPresented: $isShowingGapSheet) {
             NavigationStack {
                 Form {
+                    Section("Similarity Preset") {
+                        Picker("Preset", selection: $draftPreset) {
+                            ForEach(SimilarityPreset.allCases) { preset in
+                                Text(preset.title).tag(preset)
+                            }
+                        }
+                        .pickerStyle(.segmented)
+
+                        Text(presetDescription(for: draftPreset))
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                    }
+
                     Section("Temporal Gap") {
                         Text("Photos shot within this window are considered in the same sequence before visual similarity checks.")
                             .font(.footnote)
@@ -68,6 +92,19 @@ struct MonthAnalysisView: View {
                                 step: 10
                             )
                         }
+                    }
+
+                    Section("Cache Validation") {
+                        Picker("Mode", selection: $draftCacheValidationMode) {
+                            ForEach(CacheValidationMode.allCases) { mode in
+                                Text(mode.title).tag(mode)
+                            }
+                        }
+                        .pickerStyle(.segmented)
+
+                        Text(draftCacheValidationMode.description)
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
                     }
 
                     Section("Tracking File") {
@@ -88,7 +125,11 @@ struct MonthAnalysisView: View {
                         Button("Apply") {
                             isShowingGapSheet = false
                             Task {
-                                await viewModel.applyTemporalGap(seconds: draftGapSeconds)
+                                await viewModel.applyAnalysisSettings(
+                                    seconds: draftGapSeconds,
+                                    preset: draftPreset,
+                                    cacheValidationMode: draftCacheValidationMode
+                                )
                             }
                         }
                     }
@@ -117,17 +158,29 @@ struct MonthAnalysisView: View {
                     guard let diagnostics = result.diagnostics else { return "" }
                     return " Sequences: \(diagnostics.sequenceCount), features: \(diagnostics.featureExtractionCount), similarity links: \(diagnostics.similarityEdgeCount)."
                 }()
+                let availabilityText: String = if let status = viewModel.availabilityStatusText {
+                    " \(status)"
+                } else {
+                    ""
+                }
                 ContentUnavailableView(
                     "No Similar Groups Found",
                     systemImage: "checkmark.shield",
                     description: Text(
                         "Analyzed \(result.assetCountAnalyzed) photos and found no safe matches. " +
                             "Try another month or adjust gap and re-run." +
-                            diagnosticsText
+                            diagnosticsText +
+                            availabilityText
                     )
                 )
             } else {
                 List {
+                    if let status = viewModel.availabilityStatusText {
+                        Text(status)
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                    }
+
                     ForEach(result.groups) { group in
                         NavigationLink {
                             GroupDetailView(
@@ -152,6 +205,17 @@ struct MonthAnalysisView: View {
                 systemImage: "photo.stack",
                 description: Text("Tap Re-Run to start month analysis.")
             )
+        }
+    }
+
+    private func presetDescription(for preset: SimilarityPreset) -> String {
+        switch preset {
+        case .strict:
+            return "Fewest false matches. Best when you want only near-duplicates."
+        case .balanced:
+            return "Recommended default for typical monthly review."
+        case .relaxed:
+            return "Catches more variations of a scene, with higher false-match risk."
         }
     }
 }

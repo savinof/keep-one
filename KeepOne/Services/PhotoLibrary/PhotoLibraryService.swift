@@ -1,3 +1,4 @@
+import CryptoKit
 import Foundation
 import Photos
 
@@ -6,6 +7,10 @@ protocol PhotoLibraryServiceProtocol {
     func requestAuthorization() async -> PHAuthorizationStatus
     func fetchAvailableYears() async -> [YearSection]
     func fetchMonths(in year: Int) async -> [MonthSection]
+    func fetchMonthAssetSnapshot(
+        for selection: MonthSelection,
+        includeFullContentSignature: Bool
+    ) async -> MonthAssetSnapshot
     func fetchImageAssets(for selection: MonthSelection) async -> [PhotoAssetRef]
     func fetchAsset(localIdentifier: String) -> PHAsset?
     func deleteAssets(with localIdentifiers: [String]) async throws
@@ -67,19 +72,27 @@ final class PhotoLibraryService: PhotoLibraryServiceProtocol {
         }
     }
 
+    func fetchMonthAssetSnapshot(
+        for selection: MonthSelection,
+        includeFullContentSignature: Bool
+    ) async -> MonthAssetSnapshot {
+        await withCheckedContinuation { continuation in
+            queue.async {
+                let fetchResult = Self.fetchResultForMonth(selection: selection)
+                continuation.resume(
+                    returning: Self.snapshot(
+                        from: fetchResult,
+                        includeFullContentSignature: includeFullContentSignature
+                    )
+                )
+            }
+        }
+    }
+
     func fetchImageAssets(for selection: MonthSelection) async -> [PhotoAssetRef] {
         await withCheckedContinuation { continuation in
             queue.async {
-                let options = PHFetchOptions()
-                options.predicate = NSPredicate(
-                    format: "mediaType == %d AND creationDate >= %@ AND creationDate < %@",
-                    PHAssetMediaType.image.rawValue,
-                    selection.startDate as NSDate,
-                    selection.endDate as NSDate
-                )
-                options.sortDescriptors = [NSSortDescriptor(key: "creationDate", ascending: true)]
-
-                let fetchResult = PHAsset.fetchAssets(with: options)
+                let fetchResult = Self.fetchResultForMonth(selection: selection)
                 var results: [PhotoAssetRef] = []
                 results.reserveCapacity(fetchResult.count)
 
@@ -135,6 +148,111 @@ final class PhotoLibraryService: PhotoLibraryServiceProtocol {
         }
 
         return result
+    }
+
+    private static func fetchResultForMonth(selection: MonthSelection) -> PHFetchResult<PHAsset> {
+        let options = PHFetchOptions()
+        options.predicate = NSPredicate(
+            format: "mediaType == %d AND creationDate >= %@ AND creationDate < %@",
+            PHAssetMediaType.image.rawValue,
+            selection.startDate as NSDate,
+            selection.endDate as NSDate
+        )
+        options.sortDescriptors = [NSSortDescriptor(key: "creationDate", ascending: true)]
+        return PHAsset.fetchAssets(with: options)
+    }
+
+    private static func snapshot(
+        from fetchResult: PHFetchResult<PHAsset>,
+        includeFullContentSignature: Bool
+    ) -> MonthAssetSnapshot {
+        let count = fetchResult.count
+        guard count > 0 else {
+            return MonthAssetSnapshot(
+                assetCount: 0,
+                oldestAssetID: nil,
+                newestAssetID: nil,
+                oldestCreationDate: nil,
+                newestCreationDate: nil,
+                sampledAssetIDs: [],
+                fullContentSignature: includeFullContentSignature ? emptyContentSignature() : nil
+            )
+        }
+
+        let oldest = fetchResult.object(at: 0)
+        let newest = fetchResult.object(at: count - 1)
+        let sampleIndices = sampleIndices(totalCount: count, maxSamples: 12)
+        let sampledAssetIDs = sampleIndices.map { fetchResult.object(at: $0).localIdentifier }
+        let fullContentSignature: String? = if includeFullContentSignature {
+            monthContentSignature(from: fetchResult)
+        } else {
+            nil
+        }
+
+        return MonthAssetSnapshot(
+            assetCount: count,
+            oldestAssetID: oldest.localIdentifier,
+            newestAssetID: newest.localIdentifier,
+            oldestCreationDate: oldest.creationDate,
+            newestCreationDate: newest.creationDate,
+            sampledAssetIDs: sampledAssetIDs,
+            fullContentSignature: fullContentSignature
+        )
+    }
+
+    private static func monthContentSignature(from fetchResult: PHFetchResult<PHAsset>) -> String {
+        var hasher = SHA256()
+        fetchResult.enumerateObjects { asset, _, _ in
+            updateHasher(&hasher, with: asset.localIdentifier)
+            updateHasher(&hasher, with: asset.creationDate?.timeIntervalSinceReferenceDate)
+            updateHasher(&hasher, with: asset.modificationDate?.timeIntervalSinceReferenceDate)
+            updateHasher(&hasher, with: UInt64(asset.pixelWidth))
+            updateHasher(&hasher, with: UInt64(asset.pixelHeight))
+        }
+        return hasher.finalize().map { String(format: "%02x", $0) }.joined()
+    }
+
+    private static func emptyContentSignature() -> String {
+        let digest = SHA256.hash(data: Data())
+        return digest.map { String(format: "%02x", $0) }.joined()
+    }
+
+    private static func updateHasher(_ hasher: inout SHA256, with value: String) {
+        var data = Data(value.utf8)
+        data.append(0)
+        hasher.update(data: data)
+    }
+
+    private static func updateHasher(_ hasher: inout SHA256, with value: TimeInterval?) {
+        let marker: UInt8 = value == nil ? 0 : 1
+        hasher.update(data: Data([marker]))
+        guard let value else { return }
+        var bitPattern = value.bitPattern.littleEndian
+        withUnsafeBytes(of: &bitPattern) { bytes in
+            hasher.update(bufferPointer: bytes)
+        }
+    }
+
+    private static func updateHasher(_ hasher: inout SHA256, with value: UInt64) {
+        var littleEndian = value.littleEndian
+        withUnsafeBytes(of: &littleEndian) { bytes in
+            hasher.update(bufferPointer: bytes)
+        }
+    }
+
+    private static func sampleIndices(totalCount: Int, maxSamples: Int) -> [Int] {
+        guard totalCount > 0, maxSamples > 0 else { return [] }
+        if totalCount <= maxSamples {
+            return Array(0 ..< totalCount)
+        }
+
+        let denominator = max(1, maxSamples - 1)
+        var indices = Set<Int>()
+        for sampleIndex in 0 ..< maxSamples {
+            let position = Int(round(Double(sampleIndex) * Double(totalCount - 1) / Double(denominator)))
+            indices.insert(min(totalCount - 1, max(0, position)))
+        }
+        return indices.sorted()
     }
 
     private static func map(asset: PHAsset) -> PhotoAssetRef {

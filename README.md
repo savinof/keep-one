@@ -25,7 +25,10 @@ Reduce decision fatigue for repeated shots by:
 - `YearListView` shows available years.
 - `MonthListView` shows months for a selected year (with counts and cache marker).
 - `MonthAnalysisView` runs/loads month analysis on demand and shows groups.
+  - each group card now includes a compact ranking-diagnostics summary
+  - includes `Improve` action for optional network-assisted re-analysis
 - `GroupDetailView` highlights the suggestion, supports manual multi-select deletion, and asks for confirmation.
+  - includes compact “Why suggested” and “Why grouped” diagnostic panels
 
 ### ViewModels
 - `AppRootViewModel`: permission status and authorization request.
@@ -41,6 +44,7 @@ Reduce decision fatigue for repeated shots by:
   - image fetch for selected month only
   - explicit deletion via `PHPhotoLibrary.performChanges`
 - `ThumbnailService`: thumbnail loading and in-memory caching.
+  - analysis path supports local-first thumbnail fetch with optional network mode
 - `FeatureExtractionService`: per-photo visual features from thumbnails:
   - Vision feature print (when available)
   - perceptual hash fallback
@@ -60,10 +64,10 @@ Reduce decision fatigue for repeated shots by:
   - local JSON cache per month (`Caches/KeepOneAnalysisCache/YYYY-MM.json`)
 - `AnalysisSettingsStore`:
   - persists similarity settings in JSON
-  - tracks temporal-gap change history in the same file
+  - tracks temporal-gap and preset change history in the same file
 - `MonthAnalysisService`:
   - orchestrates month-only analysis pipeline
-  - loads persisted temporal gap at startup
+  - loads persisted temporal gap + similarity preset at startup
   - uses cache unless re-run forced
   - ignores stale cache when analysis settings changed
   - emits progress strings
@@ -123,7 +127,7 @@ README.md
 3. User selects a year.
 4. Fetch and display months for that year.
 5. User selects one month.
-6. `MonthAnalysisService`:
+6. `MonthAnalysisService` (default `Local` run mode):
    - Loads cached result if available (unless force re-run).
    - Otherwise fetches month assets only.
    - Segments by temporal proximity.
@@ -136,6 +140,10 @@ README.md
 8. User manually selects photos to delete.
 9. App asks explicit confirmation.
 10. App deletes selected photos only.
+
+Optional refinement:
+- User can run `Improve` for the same month.
+- The app re-runs analysis with network access enabled for thumbnails to recover iCloud-only items when possible.
 
 ## Conservative Grouping Strategy
 
@@ -152,9 +160,10 @@ No full-library clustering, no all-vs-all across the month.
 
 ## Current Similarity Criteria (Relaxed but Controlled)
 
-- Base thresholds:
-  - Vision feature-print distance (`default: 13`)
-  - dHash normalized Hamming distance (`default: 0.26`)
+- Presets:
+  - `Strict`: vision `11.5`, hash `0.22`
+  - `Balanced` (default): vision `13.0`, hash `0.26`
+  - `Relaxed`: vision `14.5`, hash `0.30`
 - Thresholds are relaxed by temporal proximity (closer-in-time pairs allow more variation).
 - Extra tolerance is applied when both photos likely contain the same subject:
   - both include faces
@@ -162,6 +171,9 @@ No full-library clustering, no all-vs-all across the month.
   - face area ratio is close
 - Mixed cases (face vs no-face) and no-face pairs are evaluated with stricter caps.
 - Pairwise graph edges are limited to close capture times (`<= 180s`) unless same burst id.
+- After initial edges are built, a coherence pass prunes weak bridge links:
+  - keep edge if triangle-supported (shared neighbor), or top match for either endpoint, or a strong edge
+  - remove weak links that only chain otherwise unrelated subgroups
 - Very large visual distances are still rejected to avoid clear false positives.
 - Matching remains sequence-scoped only (month + user-selected time gap), never whole-library.
 
@@ -169,6 +181,8 @@ No full-library clustering, no all-vs-all across the month.
 
 `RankingService` computes an explainable heuristic score per photo with signals inspired by Apple’s published high-level direction (multi-signal curation, not a single metric):
 - face clarity (count, prominence, centering)
+- eye openness (landmark-based proxy when detected)
+- expression quality (mouth-shape proxy when detected)
 - sharpness proxy (thumbnail gradients)
 - composition prominence (saliency + centering)
 - exposure balance (brightness + contrast)
@@ -178,6 +192,9 @@ No full-library clustering, no all-vs-all across the month.
 - screenshot penalty
 
 The top score becomes `suggestedBestAssetID`. UI labels it as a suggestion only.
+For better tie-breaking quality, analysis can run a second pass on larger thumbnails for the top 2-3 candidates in each group.
+This second pass is conservative and only applies when first-pass top candidates are close.
+Group detail now exposes per-group ranking diagnostics (first-pass gap, second-pass trigger, and whether the winner changed).
 
 Apple has not publicly documented an exact Featured-Photo/Key-Photo formula, so this MVP uses a transparent on-device approximation.
 
@@ -187,9 +204,30 @@ Apple has not publicly documented an exact Featured-Photo/Key-Photo formula, so 
 - Opening an already analyzed month returns cache quickly.
 - “Re-Run” forces fresh month analysis and rewrites cache.
 - If similarity settings differ from the cached run config, cache is skipped and analysis recomputes.
+- Cache validity also checks a lightweight month snapshot:
+  - asset count
+  - oldest/newest asset id + date
+  - sampled asset ids across the month timeline
+- Optional stronger mode: full month content signature
+  - SHA-256 hash over month asset identifiers and key metadata
+  - enabled from Settings as `Full Signature`
+- If snapshot differs from cached run, cache is treated as stale and analysis recomputes.
+- Changing cache-validation mode also forces recompute for deterministic behavior.
+
+## iCloud / Local-Thumbnail Handling
+
+- Default month analysis is local-first:
+  - network access disabled for analysis thumbnails
+  - uses local preview thumbnail if available (including degraded local previews)
+  - skips assets that are iCloud-only with no local representation
+- UI now reports availability diagnostics for each run:
+  - processed via thumbnails
+  - used degraded local previews
+  - skipped because not local
+- `Improve` re-runs month analysis with network-enabled thumbnail fetch to reduce skipped iCloud-only assets.
 
 ### Current Cache Limitations (MVP)
-- Cache invalidation is basic: no automatic diffing of library changes.
+- Snapshot mode is heuristic (fast, lower CPU); full-signature mode is stronger but still metadata-based.
 - If user edits/removes photos outside app, cache may become stale until re-run.
 - Cache stores final grouped/ranked output only (no feature-level cache).
 
@@ -198,7 +236,13 @@ Apple has not publicly documented an exact Featured-Photo/Key-Photo formula, so 
 Included tests cover:
 - temporal segmentation (`TemporalSegmentationTests`)
 - connected-components graph grouping (`GraphGroupingTests`)
+- graph coherence bridge-pruning (`GraphCoherenceRefinementTests`)
+- month-cache snapshot invalidation (`MonthAnalysisCacheInvalidationTests`)
+- second-pass ranking refinement on larger thumbnails (`MonthAnalysisSecondPassRankingTests`)
+- group-card ranking summary state mapping (`GroupCardRankingSummaryTests`)
+- group-detail diagnostics copy (`GroupDetailDiagnosticsTests`)
 - ranking behavior on mock inputs (`RankingServiceTests`)
+- similarity preset thresholds + settings backward compatibility (`SimilarityPresetTests`)
 
 ## Build / Run
 
@@ -225,19 +269,19 @@ open KeepOne.xcodeproj
 - No custom ML model.
 - Conservative thresholds may miss borderline similar photos by design.
 
-## Configurable Time Gap + Tracking File
+## Configurable Similarity Settings + Tracking File
 
-- In month analysis, use `Adjust` (or toolbar `Gap`) to change the temporal similarity gap.
-- Range: `10s` to `15m`, step `10s`.
+- In month analysis, open similarity settings from the toolbar.
+- You can set:
+  - similarity preset (`Strict`, `Balanced`, `Relaxed`)
+  - temporal gap (`10s` to `15m`, step `10s`)
+  - cache validation mode (`Snapshot` or `Full Signature`)
 - Applying a new value saves it and re-runs analysis for the current month.
-- The value and change history are tracked locally in:
+- Values and change history are tracked locally in:
   - `Application Support/KeepOne/analysis-settings.json` (inside app sandbox).
 
 ## Next Improvements
 
-1. Add stronger cache invalidation (month asset signature + delta checks).
-2. Add richer quality signals (eyes open, expression quality, saliency).
-3. Add presets for strict/balanced/relaxed similarity settings.
-4. Add batch operations across multiple selected months (still user-triggered).
-5. Add iCloud-not-local handling improvements and clearer state messages.
-6. Add test coverage for end-to-end month-analysis orchestration with mocks.
+1. Add batch operations across multiple selected months (still user-triggered).
+2. Add test coverage for end-to-end month-analysis orchestration with mocks.
+3. Add optional feature-level cache to speed up re-runs without changing behavior.

@@ -69,4 +69,74 @@ final class RankingServiceTests: XCTestCase {
 
         XCTAssertEqual(ranked.first?.asset.localIdentifier, "faceClear")
     }
+
+    func testRankingPrefersOpenEyesWhenEverythingElseIsEqual() {
+        let openEyes = TestFixtures.asset(id: "openEyes", secondsSinceReferenceDate: 0)
+        let closedEyes = TestFixtures.asset(id: "closedEyes", secondsSinceReferenceDate: 1)
+
+        let features = [
+            openEyes.localIdentifier: TestFixtures.feature(
+                asset: openEyes,
+                sharpness: 0.6,
+                faceCount: 1,
+                faceAreaRatio: 0.24,
+                faceCentering: 0.75,
+                eyeOpenness: 0.92,
+                expressionScore: 0.55,
+                luminanceMean: 0.5,
+                luminanceContrast: 0.35,
+                saliencyScore: 0.65
+            ),
+            closedEyes.localIdentifier: TestFixtures.feature(
+                asset: closedEyes,
+                sharpness: 0.6,
+                faceCount: 1,
+                faceAreaRatio: 0.24,
+                faceCentering: 0.75,
+                eyeOpenness: 0.12,
+                expressionScore: 0.55,
+                luminanceMean: 0.5,
+                luminanceContrast: 0.35,
+                saliencyScore: 0.65
+            )
+        ]
+
+        let ranked = RankingService().rank(assets: [closedEyes, openEyes], featuresByAssetID: features)
+        XCTAssertEqual(ranked.first?.asset.localIdentifier, "openEyes")
+    }
+
+    func testRankingPrefersBetterExpressionWhenEverythingElseIsEqual() {
+        let betterExpression = TestFixtures.asset(id: "betterExpression", secondsSinceReferenceDate: 0)
+        let flatExpression = TestFixtures.asset(id: "flatExpression", secondsSinceReferenceDate: 1)
+
+        let features = [
+            betterExpression.localIdentifier: TestFixtures.feature(
+                asset: betterExpression,
+                sharpness: 0.6,
+                faceCount: 1,
+                faceAreaRatio: 0.24,
+                faceCentering: 0.75,
+                eyeOpenness: 0.7,
+                expressionScore: 0.9,
+                luminanceMean: 0.5,
+                luminanceContrast: 0.35,
+                saliencyScore: 0.65
+            ),
+            flatExpression.localIdentifier: TestFixtures.feature(
+                asset: flatExpression,
+                sharpness: 0.6,
+                faceCount: 1,
+                faceAreaRatio: 0.24,
+                faceCentering: 0.75,
+                eyeOpenness: 0.7,
+                expressionScore: 0.08,
+                luminanceMean: 0.5,
+                luminanceContrast: 0.35,
+                saliencyScore: 0.65
+            )
+        ]
+
+        let ranked = RankingService().rank(assets: [flatExpression, betterExpression], featuresByAssetID: features)
+        XCTAssertEqual(ranked.first?.asset.localIdentifier, "betterExpression")
+    }
 }

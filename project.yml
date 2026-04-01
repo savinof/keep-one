@@ -19,6 +19,9 @@ targets:
       - KeepOne/Resources
     info:
       path: KeepOne/Resources/Info.plist
+      properties:
+        NSPhotoLibraryUsageDescription: "KeepOne needs photo access to analyze similar images in a month you choose and suggest one to keep."
+        NSPhotoLibraryAddUsageDescription: "KeepOne needs photo library write access to delete only photos you explicitly select."
     settings:
       base:
         PRODUCT_NAME: KeepOne

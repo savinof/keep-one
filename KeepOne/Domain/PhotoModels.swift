@@ -1,5 +1,23 @@
 import Foundation
 
+enum AnalysisRunMode: String, Hashable, Codable, Sendable {
+    case localFirst
+    case improvedWithNetwork
+
+    var allowsNetworkAccess: Bool {
+        self == .improvedWithNetwork
+    }
+
+    var shortTitle: String {
+        switch self {
+        case .localFirst:
+            return "Local"
+        case .improvedWithNetwork:
+            return "Improved"
+        }
+    }
+}
+
 struct PhotoAssetRef: Identifiable, Hashable, Codable, Sendable {
     let localIdentifier: String
     let creationDate: Date?
@@ -83,6 +101,31 @@ struct RankedPhotoCandidate: Identifiable, Hashable, Codable, Sendable {
     var id: String { asset.localIdentifier }
 }
 
+struct GroupSimilarityDiagnostics: Hashable, Codable, Sendable {
+    let edgeCount: Int
+    let minEdgeGapSeconds: TimeInterval
+    let maxEdgeGapSeconds: TimeInterval
+    let averageEdgeGapSeconds: TimeInterval
+    let minHashDistance: Double
+    let maxHashDistance: Double
+    let averageHashDistance: Double
+    let visionEdgeCount: Int
+    let minVisionDistance: Float?
+    let maxVisionDistance: Float?
+    let averageVisionDistance: Float?
+}
+
+struct GroupRankingDiagnostics: Hashable, Codable, Sendable {
+    let firstPassWinnerAssetID: String
+    let finalWinnerAssetID: String
+    let firstPassTopGap: Double?
+    let secondPassTriggered: Bool
+    let secondPassCandidateCount: Int
+    let secondPassExtractionCount: Int
+    let winnerChanged: Bool
+    let winnerChangeMargin: Double?
+}
+
 struct SimilarPhotoGroup: Identifiable, Hashable, Codable, Sendable {
     struct DateRange: Hashable, Codable, Sendable {
         let start: Date
@@ -95,6 +138,8 @@ struct SimilarPhotoGroup: Identifiable, Hashable, Codable, Sendable {
     let suggestedBestAssetID: String
     let rankedCandidates: [RankedPhotoCandidate]
     let dateRange: DateRange?
+    let similarityDiagnostics: GroupSimilarityDiagnostics?
+    let rankingDiagnostics: GroupRankingDiagnostics?
 
     var count: Int { assets.count }
 }
@@ -106,13 +151,75 @@ struct AnalysisDiagnostics: Hashable, Codable, Sendable {
     let groupCount: Int
 }
 
+struct AssetAvailabilityDiagnostics: Hashable, Codable, Sendable {
+    let processedFeatureCount: Int
+    let degradedThumbnailCount: Int
+    let skippedNoLocalThumbnailCount: Int
+}
+
+struct MonthAssetSnapshot: Hashable, Codable, Sendable {
+    let assetCount: Int
+    let oldestAssetID: String?
+    let newestAssetID: String?
+    let oldestCreationDate: Date?
+    let newestCreationDate: Date?
+    let sampledAssetIDs: [String]
+    let fullContentSignature: String?
+
+    init(
+        assetCount: Int,
+        oldestAssetID: String?,
+        newestAssetID: String?,
+        oldestCreationDate: Date?,
+        newestCreationDate: Date?,
+        sampledAssetIDs: [String],
+        fullContentSignature: String? = nil
+    ) {
+        self.assetCount = assetCount
+        self.oldestAssetID = oldestAssetID
+        self.newestAssetID = newestAssetID
+        self.oldestCreationDate = oldestCreationDate
+        self.newestCreationDate = newestCreationDate
+        self.sampledAssetIDs = sampledAssetIDs
+        self.fullContentSignature = fullContentSignature
+    }
+}
+
 struct MonthAnalysisResult: Hashable, Codable, Sendable {
     let selection: MonthSelection
     let generatedAt: Date
     let assetCountAnalyzed: Int
     let groups: [SimilarPhotoGroup]
+    let librarySnapshot: MonthAssetSnapshot?
     let config: AnalysisConfiguration
     let diagnostics: AnalysisDiagnostics?
+    let runMode: AnalysisRunMode?
+    let assetAvailabilityDiagnostics: AssetAvailabilityDiagnostics?
+    let cacheValidationMode: CacheValidationMode?
+
+    init(
+        selection: MonthSelection,
+        generatedAt: Date,
+        assetCountAnalyzed: Int,
+        groups: [SimilarPhotoGroup],
+        librarySnapshot: MonthAssetSnapshot?,
+        config: AnalysisConfiguration,
+        diagnostics: AnalysisDiagnostics?,
+        runMode: AnalysisRunMode? = nil,
+        assetAvailabilityDiagnostics: AssetAvailabilityDiagnostics? = nil,
+        cacheValidationMode: CacheValidationMode? = nil
+    ) {
+        self.selection = selection
+        self.generatedAt = generatedAt
+        self.assetCountAnalyzed = assetCountAnalyzed
+        self.groups = groups
+        self.librarySnapshot = librarySnapshot
+        self.config = config
+        self.diagnostics = diagnostics
+        self.runMode = runMode
+        self.assetAvailabilityDiagnostics = assetAvailabilityDiagnostics
+        self.cacheValidationMode = cacheValidationMode
+    }
 }
 
 struct AnalysisProgress: Hashable, Sendable {
